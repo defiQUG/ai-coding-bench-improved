@@ -14,6 +14,8 @@ cleanup() {
     kubectl delete pod cpu-test -n ai-coding-bench --ignore-not-found
     kubectl delete pod memory-test -n ai-coding-bench --ignore-not-found
     kubectl delete pod crash-test -n ai-coding-bench --ignore-not-found
+    kubectl delete pod loadtest -n ai-coding-bench --ignore-not-found
+    kubectl delete pod latency-test -n ai-coding-bench --ignore-not-found
 }
 
 # Clean up any existing test resources
@@ -37,6 +39,45 @@ kubectl run crash-test -n ai-coding-bench --image=busybox -- /bin/sh -c "while t
 echo "Waiting for Pod Restart alert to trigger (may take 15-30 minutes)..."
 sleep 30
 
+# Test Service Latency Alert
+echo -e "${BLUE}Testing Service Latency Alert...${NC}"
+# Create a test service that introduces artificial latency
+cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: latency-test
+  namespace: ai-coding-bench
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: latency-test
+  template:
+    metadata:
+      labels:
+        app: latency-test
+    spec:
+      containers:
+      - name: latency-test
+        image: nginx
+        ports:
+        - containerPort: 80
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "sed -i 's/keepalive_timeout.*/keepalive_timeout 2s;/g' /etc/nginx/nginx.conf && nginx -s reload"]
+EOF
+
+# Generate load to trigger latency alert
+echo -e "${BLUE}Generating load for latency test...${NC}"
+kubectl run -n ai-coding-bench loadtest \
+  --image=fortio/fortio \
+  -- load -qps 100 -t 300s http://latency-test.ai-coding-bench.svc.cluster.local
+
+echo "Waiting for Latency alert to trigger (may take 5-10 minutes)..."
+sleep 30
+
 # Monitor alerts in Grafana
 GRAFANA_URL=$(kubectl get service -n monitoring grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 if [ ! -z "$GRAFANA_URL" ]; then
@@ -48,6 +89,10 @@ fi
 echo -e "${BLUE}Current pod status:${NC}"
 kubectl get pods -n ai-coding-bench
 kubectl top pods -n ai-coding-bench
+
+# Show current alerts
+echo -e "${BLUE}Current alerts:${NC}"
+kubectl exec -n monitoring $(kubectl get pod -n monitoring -l app=prometheus -o jsonpath='{.items[0].metadata.name}') -- curl -s localhost:9090/api/v1/alerts
 
 echo -e "${BLUE}Alert testing in progress...${NC}"
 echo "1. Check Grafana UI for triggered alerts"
