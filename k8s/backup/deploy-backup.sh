@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo -e "${BLUE}Setting up backup system...${NC}"
+
+# Check if velero CLI is installed
+if ! command -v velero &> /dev/null; then
+    echo -e "${RED}Velero CLI is not installed. Please install it first:${NC}"
+    echo "brew install velero"
+    exit 1
+fi
+
+# Create namespace
+kubectl apply -f namespace.yaml
+
+# Install Velero with AWS S3 provider (modify credentials and bucket as needed)
+echo -e "${BLUE}Installing Velero...${NC}"
+velero install \
+    --provider aws \
+    --plugins velero/velero-plugin-for-aws:v1.7.0 \
+    --bucket ai-coding-bench-backup \
+    --backup-location-config region=us-west-2 \
+    --snapshot-location-config region=us-west-2 \
+    --secret-file ./credentials-velero
+
+# Wait for Velero to be ready
+echo -e "${BLUE}Waiting for Velero to be ready...${NC}"
+kubectl -n velero wait --for=condition=available --timeout=300s deployment/velero
+
+# Apply backup schedules
+echo -e "${BLUE}Creating backup schedules...${NC}"
+kubectl apply -f schedule.yaml
+
+echo -e "${GREEN}Backup system setup complete!${NC}"
+echo -e "${BLUE}Next steps:${NC}"
+echo "1. Verify backup schedules: velero schedule get"
+echo "2. Monitor backup jobs: velero backup get"
+echo "3. Test restore: velero restore create --from-backup <backup-name>" 

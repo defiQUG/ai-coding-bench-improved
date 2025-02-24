@@ -20,6 +20,12 @@ if ! command -v kustomize &> /dev/null; then
     exit 1
 fi
 
+# Check if metrics-server is installed
+if ! kubectl get deployment metrics-server -n kube-system &> /dev/null; then
+    echo -e "${BLUE}Installing metrics-server...${NC}"
+    kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+fi
+
 # Install cert-manager
 echo -e "${BLUE}Installing cert-manager...${NC}"
 kubectl apply -f cert-manager/namespace.yaml
@@ -38,6 +44,10 @@ kustomize build base | kubectl apply -f -
 # Deploy monitoring stack
 echo -e "${BLUE}Deploying monitoring stack...${NC}"
 cd monitoring && ./deploy-monitoring.sh && cd ..
+
+# Apply HPA configurations
+echo -e "${BLUE}Applying HPA configurations...${NC}"
+kubectl apply -f base/hpa.yaml
 
 # Wait for deployments to be ready
 echo -e "${BLUE}Waiting for deployments to be ready...${NC}"
@@ -63,4 +73,6 @@ fi
 echo -e "${BLUE}Next steps:${NC}"
 echo "1. Configure your DNS to point $API_DOMAIN to your ingress controller IP"
 echo "2. Wait for SSL certificate to be issued (check with: kubectl get certificates -n ai-coding-bench)"
-echo "3. Change the Grafana admin password" 
+echo "3. Change the Grafana admin password"
+echo "4. Monitor HPA status: kubectl get hpa -n ai-coding-bench"
+echo "5. Set up backup system: cd backup && ./deploy-backup.sh" 
