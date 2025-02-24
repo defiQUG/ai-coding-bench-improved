@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerts-advanced
+  namespace: monitoring
+data:
+  alerts.yaml: |
+    groups:
+      - name: pod_alerts
+        rules:
+        - alert: HighCPUUsage_Warning
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="ai-coding-bench",container!=""}[5m])) by (pod) * 100 > 70
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: High CPU usage warning on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has high CPU usage (> 70%) for more than 5 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/CPU-Usage-Runbook
+
+        - alert: HighCPUUsage_Critical
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="ai-coding-bench",container!=""}[5m])) by (pod) * 100 > 85
+          for: 10m
+          labels:
+            severity: critical
+            team: platform
+            escalation: oncall
+          annotations:
+            summary: Critical CPU usage on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has critical CPU usage (> 85%) for more than 10 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/CPU-Usage-Runbook
+
+        - alert: HighMemoryUsage_Warning
+          expr: sum(container_memory_working_set_bytes{namespace="ai-coding-bench",container!=""}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="ai-coding-bench",container!=""}) by (pod) * 100 > 70
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: High memory usage warning on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has high memory usage (> 70%) for more than 5 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/Memory-Usage-Runbook
+
+        - alert: HighMemoryUsage_Critical
+          expr: sum(container_memory_working_set_bytes{namespace="ai-coding-bench",container!=""}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="ai-coding-bench",container!=""}) by (pod) * 100 > 85
+          for: 10m
+          labels:
+            severity: critical
+            team: platform
+            escalation: oncall
+          annotations:
+            summary: Critical memory usage on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has critical memory usage (> 85%) for more than 10 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/Memory-Usage-Runbook
+
+        - alert: PodRestarting_Warning
+          expr: increase(kube_pod_container_status_restarts_total{namespace="ai-coding-bench"}[30m]) > 2
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: Pod restarting frequently
+            description: Pod {{ $labels.pod }} has restarted more than 2 times in 30 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/Pod-Restart-Runbook
+
+        - alert: PodRestarting_Critical
+          expr: increase(kube_pod_container_status_restarts_total{namespace="ai-coding-bench"}[15m]) > 3
+          labels:
+            severity: critical
+            team: platform
+            escalation: oncall
+          annotations:
+            summary: Pod restarting critically
+            description: Pod {{ $labels.pod }} has restarted more than 3 times in 15 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/Pod-Restart-Runbook
+
+        - alert: ServiceLatency_Warning
+          expr: rate(http_request_duration_seconds_sum{namespace="ai-coding-bench"}[5m]) / rate(http_request_duration_seconds_count{namespace="ai-coding-bench"}[5m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: High service latency
+            description: Service {{ $labels.service }} has average latency > 1s over 5 minutes
+            runbook_url: https://github.com/defiQUG/ai-coding-bench-improved/wiki/Service-Latency-Runbook 
