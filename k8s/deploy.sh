@@ -20,6 +20,14 @@ if ! command -v kustomize &> /dev/null; then
     exit 1
 fi
 
+# Install cert-manager
+echo -e "${BLUE}Installing cert-manager...${NC}"
+kubectl apply -f cert-manager/namespace.yaml
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
+kubectl -n cert-manager wait --for=condition=available --timeout=300s deployment/cert-manager
+kubectl -n cert-manager wait --for=condition=available --timeout=300s deployment/cert-manager-webhook
+kubectl apply -f cert-manager/cluster-issuer.yaml
+
 # Create namespace if it doesn't exist
 kubectl apply -f base/namespace.yaml
 
@@ -27,19 +35,32 @@ kubectl apply -f base/namespace.yaml
 echo -e "${BLUE}Applying Kubernetes resources...${NC}"
 kustomize build base | kubectl apply -f -
 
+# Deploy monitoring stack
+echo -e "${BLUE}Deploying monitoring stack...${NC}"
+cd monitoring && ./deploy-monitoring.sh && cd ..
+
 # Wait for deployments to be ready
 echo -e "${BLUE}Waiting for deployments to be ready...${NC}"
 kubectl -n ai-coding-bench wait --for=condition=available --timeout=300s deployment/api-gateway
 kubectl -n ai-coding-bench wait --for=condition=available --timeout=300s deployment/pdf-analyzer
 kubectl -n ai-coding-bench wait --for=condition=available --timeout=300s deployment/redis
 
-# Get service URL
-echo -e "${BLUE}Getting service URL...${NC}"
-EXTERNAL_IP=$(kubectl -n ai-coding-bench get service api-gateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-if [ -z "$EXTERNAL_IP" ]; then
-    echo -e "${RED}External IP not yet available. Please check service status.${NC}"
-else
-    echo -e "${GREEN}API Gateway is accessible at: http://$EXTERNAL_IP${NC}"
+# Get service URLs
+echo -e "${BLUE}Getting service URLs...${NC}"
+API_DOMAIN="api.ai-coding-bench.com"
+GRAFANA_IP=$(kubectl -n monitoring get service grafana -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+echo -e "${GREEN}Deployment complete!${NC}"
+echo -e "${BLUE}Service URLs:${NC}"
+echo -e "API Gateway: https://$API_DOMAIN"
+if [ ! -z "$GRAFANA_IP" ]; then
+    echo -e "Grafana: http://$GRAFANA_IP"
+    echo -e "Grafana credentials:"
+    echo -e "  Username: admin"
+    echo -e "  Password: changeme"
 fi
 
-echo -e "${GREEN}Deployment complete!${NC}" 
+echo -e "${BLUE}Next steps:${NC}"
+echo "1. Configure your DNS to point $API_DOMAIN to your ingress controller IP"
+echo "2. Wait for SSL certificate to be issued (check with: kubectl get certificates -n ai-coding-bench)"
+echo "3. Change the Grafana admin password" 
