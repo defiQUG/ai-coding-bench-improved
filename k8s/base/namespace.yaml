@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-coding-bench
+  labels:
+    name: ai-coding-bench
+    environment: production 

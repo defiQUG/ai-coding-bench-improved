@@ -1,0 +1,15 @@
+# Global owners
+* @defiQUG
+
+# Service-specific owners
+/services/pdf-analyzer/ @defiQUG
+/services/api-gateway/ @defiQUG
+/services/common/ @defiQUG
+
+# Infrastructure and deployment
+/.github/ @defiQUG
+/k8s/ @defiQUG
+docker-compose.yml @defiQUG
+
+# Documentation
+/docs/ @defiQUG 

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - redis.yaml
+  - pdf-analyzer.yaml
+  - api-gateway.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ai-coding-bench
+  app.kubernetes.io/managed-by: kustomize
+
+namespace: ai-coding-bench 

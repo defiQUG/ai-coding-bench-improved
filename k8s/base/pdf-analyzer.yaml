@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdf-analyzer
+  namespace: ai-coding-bench
+spec:
+  selector:
+    matchLabels:
+      app: pdf-analyzer
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: pdf-analyzer
+    spec:
+      containers:
+      - name: pdf-analyzer
+        image: ghcr.io/defiQUG/ai-coding-bench-pdf-analyzer:latest
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: PORT
+          value: "8001"
+        - name: HOST
+          value: "0.0.0.0"
+        volumeMounts:
+        - name: pdf-temp
+          mountPath: /tmp/pdf-analyzer
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: pdf-temp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pdf-analyzer
+  namespace: ai-coding-bench
+spec:
+  selector:
+    app: pdf-analyzer
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: ClusterIP 
