@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-notifications
+  namespace: velero
+type: Opaque
+data:
+  SLACK_WEBHOOK_URL: PHlvdXItc2xhY2std2ViaG9vay11cmw+  # Base64 encoded Slack webhook URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero-notifications
+  namespace: velero
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: velero-notifications
+  template:
+    metadata:
+      labels:
+        app: velero-notifications
+    spec:
+      containers:
+      - name: velero-notifications
+        image: jimmidyson/configmap-reload:v0.5.0
+        args:
+        - --webhook-url=$(SLACK_WEBHOOK_URL)
+        - --volume-dir=/tmp
+        env:
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: velero-notifications
+              key: SLACK_WEBHOOK_URL
+        volumeMounts:
+        - name: backup-logs
+          mountPath: /tmp
+      volumes:
+      - name: backup-logs
+        emptyDir: {}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: velero-notifications
+  namespace: velero
+rules:
+- apiGroups: ["velero.io"]
+  resources: ["backups", "restores"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: velero-notifications
+  namespace: velero
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: velero-notifications
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: velero 
