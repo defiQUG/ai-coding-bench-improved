@@ -41,9 +41,17 @@ kubectl apply -f base/namespace.yaml
 echo -e "${BLUE}Applying Kubernetes resources...${NC}"
 kustomize build base | kubectl apply -f -
 
+# Apply Pod Disruption Budgets
+echo -e "${BLUE}Applying Pod Disruption Budgets...${NC}"
+kubectl apply -f base/pod-disruption-budgets.yaml
+
 # Deploy monitoring stack
 echo -e "${BLUE}Deploying monitoring stack...${NC}"
-cd monitoring && ./deploy-monitoring.sh && cd ..
+cd monitoring
+./deploy-monitoring.sh
+echo -e "${BLUE}Configuring Grafana alerts...${NC}"
+./configure-alerts.sh
+cd ..
 
 # Apply HPA configurations
 echo -e "${BLUE}Applying HPA configurations...${NC}"
@@ -75,4 +83,6 @@ echo "1. Configure your DNS to point $API_DOMAIN to your ingress controller IP"
 echo "2. Wait for SSL certificate to be issued (check with: kubectl get certificates -n ai-coding-bench)"
 echo "3. Change the Grafana admin password"
 echo "4. Monitor HPA status: kubectl get hpa -n ai-coding-bench"
-echo "5. Set up backup system: cd backup && ./deploy-backup.sh" 
+echo "5. Verify PDBs: kubectl get pdb -n ai-coding-bench"
+echo "6. Check Grafana alerts: http://$GRAFANA_IP/alerting/list"
+echo "7. Set up backup system: cd backup && ./deploy-backup.sh" 

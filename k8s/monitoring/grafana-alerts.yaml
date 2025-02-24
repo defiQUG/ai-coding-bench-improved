@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerts
+  namespace: monitoring
+data:
+  alerts.yaml: |
+    groups:
+      - name: pod_alerts
+        rules:
+        - alert: HighCPUUsage
+          expr: sum(rate(container_cpu_usage_seconds_total{namespace="ai-coding-bench",container!=""}[5m])) by (pod) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: High CPU usage on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has high CPU usage (> 80%) for more than 5 minutes
+
+        - alert: HighMemoryUsage
+          expr: sum(container_memory_working_set_bytes{namespace="ai-coding-bench",container!=""}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="ai-coding-bench",container!=""}) by (pod) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: High memory usage on {{ $labels.pod }}
+            description: Pod {{ $labels.pod }} has high memory usage (> 80%) for more than 5 minutes
+
+        - alert: PodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="ai-coding-bench"}[1h]) > 2
+          labels:
+            severity: warning
+          annotations:
+            summary: Pod {{ $labels.pod }} is restarting frequently
+            description: Pod {{ $labels.pod }} has restarted more than 2 times in the last hour
+
+        - alert: HPAMaxReplicas
+          expr: kube_horizontalpodautoscaler_status_current_replicas{namespace="ai-coding-bench"} >= kube_horizontalpodautoscaler_spec_max_replicas
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: HPA at max replicas
+            description: HPA {{ $labels.horizontalpodautoscaler }} has been at max replicas for more than 10 minutes 

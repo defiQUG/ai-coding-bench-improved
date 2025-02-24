@@ -1,0 +1,32 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: ai-coding-bench
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pdf-analyzer-pdb
+  namespace: ai-coding-bench
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pdf-analyzer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb
+  namespace: ai-coding-bench
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: redis 
