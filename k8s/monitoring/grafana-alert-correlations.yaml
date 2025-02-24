@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alert-correlations
+  namespace: monitoring
+data:
+  alert-correlations.yaml: |
+    groups:
+      - name: correlation_rules
+        rules:
+        - alert: ResourceExhaustion
+          expr: |
+            (sum(rate(container_cpu_usage_seconds_total{namespace="ai-coding-bench"}[5m])) by (pod) > 80) and
+            (sum(container_memory_working_set_bytes{namespace="ai-coding-bench"}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="ai-coding-bench"}) by (pod) * 100 > 80)
+          for: 5m
+          labels:
+            severity: critical
+            correlation_group: resource_issues
+          annotations:
+            summary: "Resource exhaustion detected for pod {{ $labels.pod }}"
+            description: "Pod is experiencing both high CPU and memory usage"
+
+        - alert: ServiceDegradation
+          expr: |
+            (rate(http_request_duration_seconds_sum{namespace="ai-coding-bench"}[5m]) / rate(http_request_duration_seconds_count{namespace="ai-coding-bench"}[5m]) > 1) and
+            (sum(rate(container_cpu_usage_seconds_total{namespace="ai-coding-bench"}[5m])) by (pod) > 70)
+          for: 5m
+          labels:
+            severity: critical
+            correlation_group: performance_issues
+          annotations:
+            summary: "Service degradation detected"
+            description: "High latency correlated with high CPU usage"
+
+        - alert: PodHealthIssues
+          expr: |
+            (increase(kube_pod_container_status_restarts_total{namespace="ai-coding-bench"}[15m]) > 2) and
+            (sum(container_memory_working_set_bytes{namespace="ai-coding-bench"}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="ai-coding-bench"}) by (pod) * 100 > 85)
+          for: 5m
+          labels:
+            severity: critical
+            correlation_group: stability_issues
+          annotations:
+            summary: "Pod health issues detected"
+            description: "Pod restarts correlated with high memory usage"
+
+        - alert: NetworkIssues
+          expr: |
+            (rate(http_request_duration_seconds_sum{namespace="ai-coding-bench"}[5m]) / rate(http_request_duration_seconds_count{namespace="ai-coding-bench"}[5m]) > 1) and
+            (rate(container_network_receive_errors_total{namespace="ai-coding-bench"}[5m]) > 0)
+          for: 5m
+          labels:
+            severity: critical
+            correlation_group: network_issues
+          annotations:
+            summary: "Network issues detected"
+            description: "High latency correlated with network errors" 
