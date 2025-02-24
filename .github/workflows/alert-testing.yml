@@ -1,0 +1,79 @@
+name: Alert Testing
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Run every 6 hours
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test-alerts:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up kind cluster
+      uses: helm/kind-action@v1.8.0
+      with:
+        cluster_name: alert-test
+        config: |
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+          - role: worker
+          - role: worker
+
+    - name: Install metrics-server
+      run: |
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+        kubectl -n kube-system patch deployment metrics-server --patch '{"spec":{"template":{"spec":{"containers":[{"name":"metrics-server","args":["--cert-dir=/tmp","--secure-port=4443","--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname","--kubelet-use-node-status-port","--metric-resolution=15s","--kubelet-insecure-tls"]}]}}}}'
+
+    - name: Set up monitoring stack
+      run: |
+        kubectl create namespace monitoring
+        kubectl create namespace ai-coding-bench
+        cd k8s/monitoring
+        ./deploy-monitoring.sh
+        ./configure-alert-escalations.sh
+
+    - name: Wait for monitoring stack
+      run: |
+        kubectl wait --for=condition=available --timeout=300s deployment/prometheus -n monitoring
+        kubectl wait --for=condition=available --timeout=300s deployment/grafana -n monitoring
+
+    - name: Run alert tests
+      run: |
+        cd k8s/monitoring
+        ./test-alerts.sh
+
+    - name: Collect test results
+      run: |
+        echo "Alert Test Results:" > alert-test-results.txt
+        echo "-------------------" >> alert-test-results.txt
+        echo "Pod Status:" >> alert-test-results.txt
+        kubectl get pods -n ai-coding-bench >> alert-test-results.txt
+        echo "\nEvents:" >> alert-test-results.txt
+        kubectl get events -n ai-coding-bench >> alert-test-results.txt
+        echo "\nAlerts:" >> alert-test-results.txt
+        kubectl exec -n monitoring $(kubectl get pod -n monitoring -l app=prometheus -o jsonpath='{.items[0].metadata.name}') -- curl -s localhost:9090/api/v1/alerts >> alert-test-results.txt
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: alert-test-results
+        path: alert-test-results.txt
+
+    - name: Notify on failure
+      if: failure()
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_COLOR: '#FF0000'
+        SLACK_MESSAGE: 'Alert testing failed! Check the GitHub Actions logs for details.'
+        SLACK_TITLE: Alert Testing Failure 
