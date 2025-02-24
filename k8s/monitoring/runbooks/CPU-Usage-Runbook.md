@@ -1,12 +1,15 @@
 # CPU Usage Alert Runbook
 
 ## Alert Description
+
 This runbook addresses CPU usage alerts for pods in the ai-coding-bench namespace.
 
 ### Warning Level (>70%)
+
 Triggered when a pod's CPU usage exceeds 70% for 5 minutes.
 
 ### Critical Level (>85%)
+
 Triggered when a pod's CPU usage exceeds 85% for 10 minutes.
 
 ## Initial Assessment

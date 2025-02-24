@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-notification-templates
+  namespace: monitoring
+data:
+  correlation-template.tmpl: |
+    {{ define "slack.correlation.title" }}
+    [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] Alert Correlation Detected
+    {{ end }}
+
+    {{ define "slack.correlation.text" }}
+    {{ if eq .Status "firing" }}
+    *Correlation Group:* {{ .GroupLabels.correlation_group }}
+    *Severity:* {{ .CommonLabels.severity }}
+    *Affected Components:* {{ .CommonLabels.pod }}
+
+    *Correlated Alerts:*
+    {{ range .Alerts }}
+    • *{{ .Labels.alertname }}*
+      {{ .Annotations.description }}
+      Started: {{ .StartsAt | since }}
+    {{ end }}
+
+    *Potential Root Causes:*
+    {{ if eq .GroupLabels.correlation_group "resource_issues" }}
+    • High resource consumption patterns
+    • Resource limits misconfiguration
+    • Application memory leaks
+    {{ else if eq .GroupLabels.correlation_group "performance_issues" }}
+    • Service bottlenecks
+    • Database query performance
+    • Network latency
+    {{ else if eq .GroupLabels.correlation_group "stability_issues" }}
+    • Application crashes
+    • Configuration issues
+    • Infrastructure problems
+    {{ else if eq .GroupLabels.correlation_group "network_issues" }}
+    • Network congestion
+    • DNS issues
+    • Service mesh problems
+    {{ end }}
+
+    *Runbook:* {{ .CommonAnnotations.runbook_url }}
+    {{ else }}
+    *Resolved Alerts:*
+    {{ range .Alerts }}
+    • {{ .Labels.alertname }} - Resolved at {{ .EndsAt | since }}
+    {{ end }}
+    {{ end }}
+    {{ end }}
+
+  alert-summary.tmpl: |
+    {{ define "slack.summary.title" }}
+    [{{ .Status | toUpper }}] Alert Summary Report
+    {{ end }}
+
+    {{ define "slack.summary.text" }}
+    *Current Alert Status:*
+    • Total Active Alerts: {{ .Alerts.Firing | len }}
+    • Critical Alerts: {{ len (filter (hasLabel "severity" "critical") .Alerts.Firing) }}
+    • Warning Alerts: {{ len (filter (hasLabel "severity" "warning") .Alerts.Firing) }}
+
+    *Alert Groups:*
+    {{ range groupByLabel .Alerts.Firing "correlation_group" }}
+    • {{ .Name }}: {{ len .Alerts }} alert(s)
+    {{ end }}
+
+    *Recent Changes (Last 1h):*
+    {{ range .Alerts.Firing }}
+    {{ if (since .StartsAt).Hours | lt 1.0 }}
+    • {{ .Labels.alertname }} - {{ .Annotations.summary }}
+    {{ end }}
+    {{ end }}
+
+    *Dashboard:* {{ .ExternalURL }}
+    {{ end }} 
