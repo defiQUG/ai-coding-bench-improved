@@ -1,0 +1,14 @@
+[submodule "services/pdf-analyzer"]
+    path = services/pdf-analyzer
+    url = https://github.com/your-org/ai-coding-bench-pdf-analyzer.git
+    branch = main
+
+[submodule "services/api-gateway"]
+    path = services/api-gateway
+    url = https://github.com/your-org/ai-coding-bench-api-gateway.git
+    branch = main
+
+[submodule "services/common"]
+    path = services/common
+    url = https://github.com/your-org/ai-coding-bench-common.git
+    branch = main 
